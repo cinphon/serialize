@@ -1,5 +1,5 @@
 import deepEqual from 'deep-equal'
-import { JSONParse, JSONStringify, QueryParse, QueryStringify } from '../src/index'
+import { JSONParse, JSONStringify, QueryParse, QueryStringify } from '../src'
 
 const debug = require('debug')('cinphon:serialize')
 
