@@ -4,27 +4,40 @@ import { JSONParse, JSONStringify, QueryParse, QueryStringify } from '../src'
 const debug = require('debug')('cinphon:serialize')
 
 const data = {
-  say: 'こんにちは 世界',
-  nil: null,
-  nilStr: '_null_',
-  yes: true,
-  yesStr: '_true_',
-  no: false,
-  noStr: '_false_',
-  now: new Date(),
-  nowStr: '_' + new Date().toISOString() + '_',
-  re: /^hi$/i,
-  reStr: '_/^hi$/i_',
-  pi: 3.14,
-  nan: NaN,
-  nanStr: '_NaN_',
+  string: 'こんにちは 世界',
+  null: {
+    nil: null,
+    nilStr: '_null_',
+  },
+  bool: [
+    {
+      yes: true,
+      yesStr: '_true_',
+    },
+    {
+      no: false,
+      noStr: '_false_', 
+    },
+  ],
+  date: {
+    now: new Date(),
+    nowStr: '_' + new Date().toISOString() + '_',
+  },
+  number: {
+    float: {
+      pi: 3.14,
+    },
+    nan: NaN,
+    nanStr: '_NaN_',
+  },
+  regexp: [/^hi$/i, '_/^hi$/i_'],
 }
 
 test('JSON Serialization', () => {
   let s = JSONStringify(data)
   let o = JSONParse(s)
 
-  debug(s)
+  debug(decodeURIComponent(s))
   
   expect(deepEqual(o, data, {
     strict: true,
