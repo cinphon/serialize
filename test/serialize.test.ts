@@ -1,56 +1,71 @@
 import deepEqual from 'deep-equal'
+import { range } from 'lodash'
 import { JSONParse, JSONStringify, QueryParse, QueryStringify } from '../src'
 
 const debug = require('debug')('cinphon:serialize')
 
-const data = {
+const DATE = new Date()
+
+const RECORD = {
   string: 'こんにちは 世界',
   null: {
     nil: null,
-    nilStr: '_null_',
+    nilStr: 'null',
   },
   bool: [
     {
       yes: true,
-      yesStr: '_true_',
+      yesStr: 'true',
     },
     {
       no: false,
-      noStr: '_false_', 
+      noStr: 'false', 
     },
   ],
   date: {
     now: new Date(),
-    nowStr: '_' + new Date().toISOString() + '_',
+    nowStr: '' + new Date().toISOString() + '',
   },
   number: {
     float: {
       pi: 3.14,
     },
     nan: NaN,
-    nanStr: '_NaN_',
+    nanStr: 'NaN',
   },
-  regexp: [/^hi$/i, '_/^hi$/i_'],
+  regexp: [/^hi$/i, '/^hi$/i'],
 }
 
-test('JSON Serialization', () => {
+test('JSON Date Serialization', () => {
+  let s = JSONStringify(DATE)
+  let o = JSONParse(s) as Date
+
+  debug(s)
+  
+  expect(DATE.getTime()).toEqual(o.getTime())
+})
+
+test('JSON Record Serialization', () => {
+  // const data = { o: range(100).map(() => RECORD)}
+  const data = RECORD
+
   let s = JSONStringify(data)
   let o = JSONParse(s)
 
-  debug(decodeURIComponent(s))
+  debug(s)
   
   expect(deepEqual(o, data, {
     strict: true,
   })).toBeTruthy()
 })
 
-test('Query Serialization', () => {
-  let s = QueryStringify(data)
+test('Query Record Serialization', () => {
+  let s = QueryStringify(RECORD)
   let o = QueryParse(s)
 
   debug(s)
   
-  expect(deepEqual(o, data, {
+  expect(deepEqual(o, RECORD, {
     strict: true,
   })).toBeTruthy()
 })
