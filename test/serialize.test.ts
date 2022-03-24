@@ -7,7 +7,8 @@ const debug = require('debug')('cinphon:serialize')
 const DATE = new Date()
 
 const RECORD = {
-  string: 'こんにちは 世界',
+  // ['text.世界=t&ERROR[abc]']: 'こんにちは 世界',
+  ['text.$sekai']: 'こんにちは 世界',
   null: {
     nil: null,
     nilStr: 'null',
@@ -27,11 +28,13 @@ const RECORD = {
     nowStr: '' + new Date().toISOString() + '',
   },
   number: {
+    int: [2313, 0xff],
     float: {
       pi: 3.14,
+      e: -1.7,
     },
-    nan: NaN,
-    nanStr: 'NaN',
+    nan: [NaN, 'NaN', 'NAN'],
+    infinity: [Infinity, -Infinity, 'Infinity', '-INFINITY'],
   },
   regexp: [/^hi$/i, '/^hi$/i'],
 }
@@ -64,6 +67,7 @@ test('Query Record Serialization', () => {
   let o = QueryParse(s)
 
   debug(s)
+  debug(decodeURIComponent(s))
   
   expect(deepEqual(o, RECORD, {
     strict: true,

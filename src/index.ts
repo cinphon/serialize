@@ -1,68 +1,76 @@
 import qs from 'qs'
 
-const DATE_PATTERN = /^_(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?Z)_$/
-const RE_PATTERN = /^_[/](.+)[/]([dgimsuy]*)_$/
-const NUMBER_PATTERN = /^_(-?[0-9]+(\.[0-9]+)?)_$/
+const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?Z$/
+
+// For url friendly delimiter, use '~' instead of '/' while the later is DE FACTO in JS
+const RE_PATTERN = /^[~](.+)[~]([dgimsuy]*)$/
+
+// Use HEX for safe integer, all UPPERCASE
+const INT_PATTERN = /^-?0[X]([0-9A-F]{1,13}|[01][0-9A-F]{13})$/
+
+// Use EXPO for ALL number includes big integer, with '+' following 'e' removed for url friendliness, all UPPERCASE
+const NUM_PATTERN = /^-?[1-9](\.[0-9]+)?[E]-?[0-9]+$/
+
+const SPECIAL_NUM_MAP: Record<string, number> = {
+  [String(NaN).toUpperCase()]: NaN,
+  [String(Infinity).toUpperCase()]: Infinity,
+  [String(-Infinity).toUpperCase()]: -Infinity,
+}
+
+const SPECIAL_NUM_VALUES = Object.values(SPECIAL_NUM_MAP)
 
 type TYPE<T> = {
   parse: (str: string) => T | undefined
   stringify: (value: unknown) => string | undefined
 }
 
-// const NULL = {
-//   match: /^null$/,
-//   parse: (str: string) => null,
-//   test: (value: any) => value === null,
-//   stringify: (value: null) => String(null),
-// }
-
-// const INT = {
-//   match: /^-?[0-9]+$/,
-//   parse: (str: string) => {
-//     const int = parseInt(str)
-//     return Number.isSafeInteger(int) ? int : str
-//   },
-//   test: (value: any) => Number.isSafeInteger(value),
-//   stringify: (value: number) => value.toFixed(),
-// }
+const NULL: TYPE<null> = {
+  parse: (str: string) => (str === 'NULL' ? null : undefined),
+  stringify: (value: unknown) => (value === null ? 'NULL' : undefined),
+}
 
 const BOOL: TYPE<boolean> = {
-  parse: (str: string) => (str === '_true_' ? true : str === '_false_' ? false : undefined),
-  stringify: (value: unknown) => (typeof value === 'boolean' ? `_${value}_` : undefined),
+  parse: (str: string) => (str === 'TRUE' ? true : str === 'FALSE' ? false : undefined),
+  stringify: (value: unknown) => (typeof value === 'boolean' ? String(value).toUpperCase() : undefined),
+}
+
+const SPECIAL_NUM: TYPE<number> = {
+  parse: (str: string) => SPECIAL_NUM_MAP[str],
+  stringify: (value: unknown) =>
+    SPECIAL_NUM_VALUES.includes(value as number) ? String(value).toUpperCase() : undefined,
 }
 
 const NUM: TYPE<number> = {
   parse: (str: string) => {
-    let m = str.match(NUMBER_PATTERN)
-    if (m?.[1]) {
-      const prec = m[1].length - (m[1].startsWith('-') ? 2 : 1)
-      const num = parseFloat(m[1])
-      if (num.toPrecision(prec) === m[1]) {
-        return num
+    if (INT_PATTERN.test(str)) {
+      return Number.parseInt(str, 16)
+    } else if (NUM_PATTERN.test(str)) {
+      return Number.parseFloat(str)
+    }
+  },
+  stringify: (value: unknown) => {
+    if (typeof value === 'number') {
+      if (Number.isSafeInteger(value)) {
+        return ('0x' + value.toString(16)).toUpperCase()
+      } else {
+        return value.toExponential().replace('e+', 'e').toUpperCase()
       }
     }
   },
-  stringify: (value: unknown) => (typeof value === 'number' ? `_${value.toPrecision()}_` : undefined),
-}
-
-const NAN: TYPE<number> = {
-  parse: (str: string) => (str === '_NaN_' ? NaN : undefined),
-  stringify: (value: unknown) => (Number.isNaN(value) ? '_NaN_' : undefined),
 }
 
 const DATE: TYPE<Date> = {
   parse: (str: string) => {
-    let m = str.match(DATE_PATTERN)
-    if (m?.[1]) {
-      return new Date(m[1])
+    if (DATE_PATTERN.test(str)) {
+      return new Date(str)
     }
   },
   stringify: (value: unknown) => {
     if (value instanceof Date) {
       try {
-        return `_${value.toISOString()}_`
+        return value.toISOString()
       } catch (e) {
-        return '_0000-00-00T00:00:00.000Z_'
+        return '0000-00-00T00:00:00.000Z'
       }
     }
   },
@@ -75,7 +83,7 @@ const RE: TYPE<RegExp> = {
       return new RegExp(m[1], m?.[2] || '')
     }
   },
-  stringify: (value: unknown) => (value instanceof RegExp ? `_${value}_` : undefined),
+  stringify: (value: unknown) => (value instanceof RegExp ? `~${value.source}~${value.flags}` : undefined),
 }
 
 const parse = (str: string, ...types: TYPE<any>[]) => {
@@ -112,7 +120,7 @@ export const JSONStringify = (data: any) => {
   //@ts-ignore
   delete Date.prototype.toJSON
 
-  const text = JSON.stringify(data, (key, value) => stringify(value, NAN, DATE, RE))
+  const text = JSON.stringify(data, (key, value) => stringify(value, SPECIAL_NUM, DATE, RE))
 
   Date.prototype.toJSON = reserved
 
@@ -122,7 +130,7 @@ export const JSONStringify = (data: any) => {
 export const JSONParse = (text: string) =>
   JSON.parse(text, (key, value) => {
     if (typeof value === 'string') {
-      return parse(value, NAN, DATE, RE)
+      return parse(value, SPECIAL_NUM, DATE, RE)
     }
 
     return value
@@ -132,8 +140,15 @@ export const QueryStringify = (data: any) =>
   qs.stringify(data, {
     allowDots: false,
     strictNullHandling: true,
+    encoder: function (str, defaultEncoder, charset, type) {
+      if (type === 'key') {
+        return str.replaceAll('$', '%24')
+      }
+
+      return encodeURIComponent(str)
+    },
     filter: (prefix, value) => {
-      return stringify(value, NAN, BOOL, NUM, DATE, RE)
+      return stringify(value, SPECIAL_NUM, BOOL, NUM, DATE, RE)
     },
   })
 
@@ -142,10 +157,10 @@ export const QueryParse = (text: string) =>
     allowDots: false,
     strictNullHandling: true,
     decoder: (str, defaultDecoder, charset, type) => {
-      str = defaultDecoder(str, charset)
+      str = decodeURIComponent(str)
 
       if (type === 'value') {
-        return parse(str, NAN, BOOL, NUM, DATE, RE)
+        return parse(str, SPECIAL_NUM, BOOL, NUM, DATE, RE)
       }
 
       return str
