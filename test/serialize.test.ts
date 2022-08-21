@@ -1,5 +1,4 @@
 import deepEqual from 'deep-equal'
-import { range } from 'lodash'
 import { JSONParse, JSONStringify, QueryParse, QueryStringify } from '../src'
 
 const debug = require('debug')('cinphon:serialize')
